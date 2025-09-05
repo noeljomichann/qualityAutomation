@@ -32,7 +32,7 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
       setLoading(true);
       setError(null);
       
-      const baseUrl = "https://65ca38ce8f32.ngrok-free.app";
+      const baseUrl = "https://8a526fb47a4d.ngrok-free.app";
       const endpoint = getEndpointForCard(title);
       const fullUrl = `${baseUrl}/${endpoint}`;
 
