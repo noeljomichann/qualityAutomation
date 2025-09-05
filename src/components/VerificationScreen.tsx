@@ -86,7 +86,7 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
         confidence: result.status === "success" ? 95 : 65,
         analysis: result.analysis,
         summary: result.analysis,
-        responseImage: result.image ? `data:image/jpeg;base64,${result.image}` : null
+        responseImage: result.image ? result.image : null
       };
       
       setAnalysis(transformedAnalysis);
