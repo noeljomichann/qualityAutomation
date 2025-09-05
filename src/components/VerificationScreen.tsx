@@ -79,6 +79,15 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
       }
       
       const result = await apiResponse.json();
+      const op_image = result.image ? result.image : null
+      const base64Data = op_image.split(',')[1];
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/jpeg' });
       
       // Transform API response to our format
       const transformedAnalysis = {
@@ -86,7 +95,7 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
         confidence: result.status === "success" ? 95 : 65,
         analysis: result.analysis,
         summary: result.analysis,
-        responseImage: result.image ? result.image : null
+        responseImage: blob
       };
       
       setAnalysis(transformedAnalysis);
