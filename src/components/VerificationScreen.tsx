@@ -32,7 +32,7 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
       setLoading(true);
       setError(null);
       
-      const baseUrl = "https://962b83dd2a63.ngrok-free.app";
+      const baseUrl = "https://6205cded8be9.ngrok-free.app/";
       const endpoint = getEndpointForCard(title);
       
       // Convert base64 image to blob
@@ -60,8 +60,8 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
       
       // Transform API response to our format
       const transformedAnalysis = {
-        status: result.status === "pass" ? "passed" : "failed",
-        confidence: result.status === "pass" ? 95 : 65,
+        status: result.status === "success" ? "passed" : "failed",
+        confidence: result.status === "success" ? 95 : 65,
         analysis: result.analysis,
         summary: result.analysis
       };
