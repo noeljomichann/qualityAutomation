@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, CheckCircle, AlertTriangle, Info } from 'lucide-react';
+import { ArrowLeft, CheckCircle, AlertTriangle, Info, Loader2 } from 'lucide-react';
 
 interface VerificationScreenProps {
   image: string;
@@ -12,70 +12,76 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
   title, 
   onBack 
 }) => {
-  // Simulate AI analysis results based on the card type
-  const getAnalysisResults = (cardTitle: string) => {
-    const analysisMap: Record<string, any> = {
-      "Fastening Integrity Checks": {
-        status: "passed",
-        confidence: 94,
-        findings: [
-          { type: "success", text: "All bolts properly tightened to specification" },
-          { type: "success", text: "No visible wear or corrosion detected" },
-          { type: "warning", text: "Minor surface scratches observed (within tolerance)" }
-        ],
-        summary: "Component fastening meets safety standards with 94% confidence."
-      },
-      "Component Integrity Validation": {
-        status: "passed",
-        confidence: 98,
-        findings: [
-          { type: "success", text: "Genuine OEM component verified" },
-          { type: "success", text: "Serial number matches database records" },
-          { type: "success", text: "Material composition within specifications" }
-        ],
-        summary: "Component authenticity and integrity confirmed with high confidence."
-      },
-      "Measurement Accuracy Verification": {
-        status: "attention",
-        confidence: 87,
-        findings: [
-          { type: "success", text: "Primary measurements within tolerance" },
-          { type: "warning", text: "Edge measurement slightly below optimal range" },
-          { type: "info", text: "Recommend re-measurement for critical applications" }
-        ],
-        summary: "Measurements mostly accurate, minor attention required for edge cases."
-      },
-      "Installation or Placement Accuracy": {
-        status: "passed",
-        confidence: 96,
-        findings: [
-          { type: "success", text: "Perfect alignment detected" },
-          { type: "success", text: "Proper clearance maintained" },
-          { type: "success", text: "Installation follows manufacturer guidelines" }
-        ],
-        summary: "Installation completed with excellent precision and adherence to standards."
-      },
-      "Distance & Dimensional Precision": {
-        status: "passed",
-        confidence: 92,
-        findings: [
-          { type: "success", text: "Dimensional accuracy within 0.1mm tolerance" },
-          { type: "success", text: "Spacing consistency verified across all points" },
-          { type: "info", text: "Measurements logged for quality tracking" }
-        ],
-        summary: "Dimensional precision meets engineering specifications with high accuracy."
-      }
-    };
+  const [analysis, setAnalysis] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-    return analysisMap[cardTitle] || analysisMap["Component Integrity Validation"];
+  const getEndpointForCard = (cardTitle: string): string => {
+    const endpointMap: Record<string, string> = {
+      "Fastening Integrity Checks": "fastener_analysis",
+      "Component Integrity Validation": "component_integrity",
+      "Measurement Accuracy Verification": "measurement-analysis",
+      "Installation or Placement Accuracy": "installation-analysis",
+      "Distance & Dimensional Precision": "inverter-spacing-analysis"
+    };
+    return endpointMap[cardTitle] || "fastener_analysis";
   };
 
-  const analysis = getAnalysisResults(title);
+  const analyzeImage = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const baseUrl = "https://962b83dd2a63.ngrok-free.app";
+      const endpoint = getEndpointForCard(title);
+      
+      // Convert base64 image to blob
+      const response = await fetch(image);
+      const blob = await response.blob();
+      
+      // Create FormData
+      const formData = new FormData();
+      formData.append('file', blob, 'image.jpg');
+      
+      // Make API call
+      const apiResponse = await fetch(`${baseUrl}/${endpoint}`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'ngrok-skip-browser-warning': 'true'
+        }
+      });
+      
+      if (!apiResponse.ok) {
+        throw new Error(`API request failed: ${apiResponse.status}`);
+      }
+      
+      const result = await apiResponse.json();
+      
+      // Transform API response to our format
+      const transformedAnalysis = {
+        status: result.status === "pass" ? "passed" : "failed",
+        confidence: result.status === "pass" ? 95 : 65,
+        analysis: result.analysis,
+        summary: result.analysis
+      };
+      
+      setAnalysis(transformedAnalysis);
+    } catch (err) {
+      console.error('Analysis error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to analyze image');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  React.useEffect(() => {
+    analyzeImage();
+  }, [image, title]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "passed": return "text-green-600";
-      case "attention": return "text-amber-600";
       case "failed": return "text-red-600";
       default: return "text-warm-gray";
     }
@@ -84,7 +90,6 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "passed": return <CheckCircle className="w-5 h-5" />;
-      case "attention": return <AlertTriangle className="w-5 h-5" />;
       case "failed": return <AlertTriangle className="w-5 h-5" />;
       default: return <Info className="w-5 h-5" />;
     }
@@ -92,11 +97,6 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
 
   const getIconForType = (type: string) => {
     switch (type) {
-      case "success": return <CheckCircle className="w-4 h-4 text-green-600" />;
-      case "warning": return <AlertTriangle className="w-4 h-4 text-amber-600" />;
-      case "info": return <Info className="w-4 h-4 text-blue-600" />;
-      default: return <Info className="w-4 h-4 text-warm-gray" />;
-    }
   };
 
   return (
@@ -131,64 +131,99 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
               />
               <div className="absolute top-4 right-4">
                 <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
-                  analysis.status === 'passed' 
+                  loading ? 'bg-blue-100 text-blue-800' :
+                  analysis?.status === 'passed' 
                     ? 'bg-green-100 text-green-800' 
-                    : analysis.status === 'attention'
-                    ? 'bg-amber-100 text-amber-800'
                     : 'bg-red-100 text-red-800'
                 }`}>
-                  {getStatusIcon(analysis.status)}
-                  <span className="capitalize">{analysis.status}</span>
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Analyzing...</span>
+                    </>
+                  ) : error ? (
+                    <>
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>Error</span>
+                    </>
+                  ) : (
+                    <>
+                      {getStatusIcon(analysis?.status)}
+                      <span className="capitalize">{analysis?.status}</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Analysis results section */}
             <div className="p-8">
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-bold text-charcoal">Analysis Results</h2>
-                  <div className="text-right">
-                    <div className="text-sm text-warm-gray">Confidence Score</div>
-                    <div className="text-2xl font-bold text-sage">{analysis.confidence}%</div>
-                  </div>
+              {loading ? (
+                <div className="text-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-sage" />
+                  <p className="text-warm-gray">Analyzing your image...</p>
                 </div>
-                <p className="text-warm-gray leading-relaxed">
-                  {analysis.summary}
-                </p>
-              </div>
-
-              {/* Detailed findings */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-charcoal mb-3">Detailed Findings</h3>
-                <div className="space-y-3">
-                  {analysis.findings.map((finding: any, index: number) => (
-                    <div
-                      key={index}
-                      className="flex items-start gap-3 p-4 rounded-xl bg-gray-50 border border-gray-100"
-                    >
-                      {getIconForType(finding.type)}
-                      <p className="text-charcoal flex-1">{finding.text}</p>
+              ) : error ? (
+                <div className="text-center py-12">
+                  <AlertTriangle className="w-8 h-8 mx-auto mb-4 text-red-500" />
+                  <p className="text-red-600 mb-4">Analysis Failed</p>
+                  <p className="text-warm-gray mb-4">{error}</p>
+                  <button
+                    onClick={analyzeImage}
+                    className="bg-sage hover:bg-sage-dark text-white py-2 px-4 rounded-lg font-medium transition-colors duration-200"
+                  >
+                    Retry Analysis
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-2xl font-bold text-charcoal">Analysis Results</h2>
+                      <div className="text-right">
+                        <div className="text-sm text-warm-gray">Confidence Score</div>
+                        <div className="text-2xl font-bold text-sage">{analysis?.confidence}%</div>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </div>
+                    <p className="text-warm-gray leading-relaxed">
+                      {analysis?.summary}
+                    </p>
+                  </div>
 
-              {/* Action buttons */}
-              <div className="mt-8 flex flex-col sm:flex-row gap-3">
-                <button className="flex-1 bg-sage hover:bg-sage-dark text-white py-3 px-6 rounded-lg font-medium transition-colors duration-200">
-                  Download Report
-                </button>
-                <button className="flex-1 border border-sage text-sage hover:bg-sage hover:text-white py-3 px-6 rounded-lg font-medium transition-colors duration-200">
-                  Save to Archive
-                </button>
-                <button 
-                  onClick={onBack}
-                  className="flex-1 border border-warm-beige text-warm-gray hover:bg-warm-beige hover:text-charcoal py-3 px-6 rounded-lg font-medium transition-colors duration-200"
-                >
-                  Verify Another
-                </button>
-              </div>
+                  {/* Analysis details */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-charcoal mb-3">Analysis Details</h3>
+                    <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
+                      <div className="flex items-start gap-3">
+                        {analysis?.status === 'passed' ? (
+                          <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+                        ) : (
+                          <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+                        )}
+                        <div className="flex-1">
+                          <p className="text-charcoal leading-relaxed">{analysis?.analysis}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="mt-8 flex flex-col sm:flex-row gap-3">
+                    <button className="flex-1 bg-sage hover:bg-sage-dark text-white py-3 px-6 rounded-lg font-medium transition-colors duration-200">
+                      Download Report
+                    </button>
+                    <button className="flex-1 border border-sage text-sage hover:bg-sage hover:text-white py-3 px-6 rounded-lg font-medium transition-colors duration-200">
+                      Save to Archive
+                    </button>
+                    <button 
+                      onClick={onBack}
+                      className="flex-1 border border-warm-beige text-warm-gray hover:bg-warm-beige hover:text-charcoal py-3 px-6 rounded-lg font-medium transition-colors duration-200"
+                    >
+                      Verify Another
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
