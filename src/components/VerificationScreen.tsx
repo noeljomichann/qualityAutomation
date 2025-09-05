@@ -79,8 +79,7 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
       }
       
       const result = await apiResponse.json();
-      op_image = result.image ? result.image : null
-      const base64Data = op_image.split(',')[1];
+      const base64Data = result.image.split(',')[1];
       const byteCharacters = atob(base64Data);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
