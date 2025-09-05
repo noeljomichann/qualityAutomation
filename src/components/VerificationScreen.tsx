@@ -97,6 +97,8 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
 
   const getIconForType = (type: string) => {
     switch (type) {
+      default: return <Info className="w-5 h-5" />;
+    }
   };
 
   return (
