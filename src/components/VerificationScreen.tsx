@@ -35,9 +35,15 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
       const baseUrl = "https://6205cded8be9.ngrok-free.app";
       const endpoint = getEndpointForCard(title);
       
-      // Convert base64 image to blob
-      const response = await fetch(image);
-      const blob = await response.blob();
+      // Convert base64 data URL to blob
+      const base64Data = image.split(',')[1];
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/jpeg' });
       
       // Create FormData
       const formData = new FormData();
