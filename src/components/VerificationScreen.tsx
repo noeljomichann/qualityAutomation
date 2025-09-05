@@ -32,7 +32,7 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
       setLoading(true);
       setError(null);
       
-      const baseUrl = "https://962b83dd2a63.ngrok-free.app";
+      const baseUrl = "https://6205cded8be9.ngrok-free.app";
       const endpoint = getEndpointForCard(title);
       
       // Convert base64 image to blob
