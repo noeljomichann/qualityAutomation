@@ -34,6 +34,22 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
       
       const baseUrl = "https://6205cded8be9.ngrok-free.app";
       const endpoint = getEndpointForCard(title);
+      const fullUrl = `${baseUrl}/${endpoint}`;
+
+      console.log('Attempting to connect to:', fullUrl);
+
+      try {
+        const healthCheck = await fetch(baseUrl, {
+          method: 'HEAD',
+          headers: {
+            'ngrok-skip-browser-warning': 'true'
+          }
+        });
+        console.log('Health check response:', healthCheck.status);
+      } catch (healthError) {
+        console.error('Health check failed:', healthError);
+        throw new Error('Server is not reachable. Please check if your ngrok tunnel is running.');
+      }
       
       // Convert base64 data URL to blob
       const base64Data = image.split(',')[1];
