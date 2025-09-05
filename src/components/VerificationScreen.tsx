@@ -85,7 +85,8 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
         status: result.status === "success" ? "passed" : "failed",
         confidence: result.status === "success" ? 95 : 65,
         analysis: result.analysis,
-        summary: result.analysis
+        summary: result.analysis,
+        responseImage: result.image ? `data:image/jpeg;base64,${result.image}` : null
       };
       
       setAnalysis(transformedAnalysis);
@@ -149,7 +150,7 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
             {/* Image section */}
             <div className="relative">
               <img
-                src={image}
+                src={analysis?.responseImage || image}
                 alt="Verification image"
                 className="w-full h-96 object-cover"
               />
