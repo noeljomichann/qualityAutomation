@@ -27,76 +27,111 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({
     return endpointMap[cardTitle] || "fastener_analysis";
   };
 
-  const analyzeImage = async () => {
+const analyzeImage = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+
+    const baseUrl = "https://340bda349f32.ngrok-free.app";
+    const endpoint = getEndpointForCard(title);
+    const fullUrl = `${baseUrl}/${endpoint}`;
+
+    // quick reachability check (optional)
     try {
-      setLoading(true);
-      setError(null);
-      
-      const baseUrl = "https://340bda349f32.ngrok-free.app";
-      const endpoint = getEndpointForCard(title);
-      const fullUrl = `${baseUrl}/${endpoint}`;
-
-      console.log('Attempting to connect to:', fullUrl);
-
-      try {
-        const healthCheck = await fetch(baseUrl, {
-          method: 'HEAD',
-          headers: {
-            'ngrok-skip-browser-warning': 'true'
-          }
-        });
-        console.log('Health check response:', healthCheck.status);
-      } catch (healthError) {
-        console.error('Health check failed:', healthError);
-        throw new Error('Server is not reachable. Please check if your ngrok tunnel is running.');
-      }
-      
-      // Convert base64 data URL to blob
-      const base64Data = image.split(',')[1];
-      const byteCharacters = atob(base64Data);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'image/jpeg' });
-      
-      // Create FormData
-      const formData = new FormData();
-      formData.append('file', blob, 'image.jpg');
-      
-      // Make API call
-      const apiResponse = await fetch(`${baseUrl}/${endpoint}`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'ngrok-skip-browser-warning': 'true'
-        }
+      const healthCheck = await fetch(baseUrl, {
+        method: "HEAD",
+        headers: { "ngrok-skip-browser-warning": "true" },
       });
-      
-      if (!apiResponse.ok) {
-        throw new Error(`API request failed: ${apiResponse.status}`);
-      }
-      
-      const result = await apiResponse.json();
-      
-      // Transform API response to our format
-      const transformedAnalysis = {
-        status: result.status === "success" ? "passed" : "failed",
-        confidence: result.status === "success" ? 95 : 65,
-        analysis: result.analysis,
-        summary: result.analysis,
-        responseImage: result.image ? result.image : null
-      };
-      
-      setAnalysis(transformedAnalysis);
-    } catch (err) {
-      console.error('Analysis error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to analyze image');
-    } finally {
-      setLoading(false);
+      if (!healthCheck.ok) throw new Error(`Server HEAD ${healthCheck.status}`);
+    } catch (e) {
+      throw new Error("Server is not reachable. Please check your ngrok tunnel.");
     }
-  };
+
+    // base64 dataURL -> Blob
+    const base64Data = image.split(",")[1];
+    const byteChars = atob(base64Data);
+    const byteNums = new Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i);
+    const byteArray = new Uint8Array(byteNums);
+    const uploadBlob = new Blob([byteArray], { type: "image/jpeg" });
+
+    const formData = new FormData();
+    formData.append("file", uploadBlob, "image.jpg");
+
+    const apiResponse = await fetch(fullUrl, {
+      method: "POST",
+      body: formData,
+      headers: { "ngrok-skip-browser-warning": "true" },
+    });
+
+    if (!apiResponse.ok) {
+      throw new Error(`API request failed: ${apiResponse.status}`);
+    }
+
+    // Handle both JSON and binary responses
+    const contentType = apiResponse.headers.get("content-type") || "";
+
+    let responseImage: string | null = null;
+    let status = "failed";
+    let summary: string | undefined;
+    let analysisText: string | undefined;
+    let confidence = 65;
+
+    if (contentType.includes("application/json")) {
+      const result = await apiResponse.json();
+
+      // Prefer image_base64, then image
+      responseImage =
+        result.image_base64 ??
+        result.image ??
+        null;
+
+      // Ensure proper data URL prefix if missing
+      if (responseImage && !responseImage.startsWith("data:image")) {
+        responseImage = `data:image/jpeg;base64,${responseImage}`;
+      }
+
+      status = result.status === "success" ? "passed" : "failed";
+      // Try to derive confidence if backend sends one
+      confidence = typeof result.avg_confidence === "number"
+        ? Math.round(result.avg_confidence * 100)
+        : status === "passed" ? 95 : 65;
+
+      // Optional text fields
+      analysisText = result.analysis ?? result.message ?? "";
+      summary = result.summary ?? analysisText;
+    } else if (contentType.startsWith("image/")) {
+      // Binary image (e.g., FileResponse)
+      const blob = await apiResponse.blob();
+      responseImage = URL.createObjectURL(blob); // Object URL for <img src=...>
+      status = "passed"; // you can adjust if you also read custom headers
+      confidence = 95;
+
+      // If you set descriptive headers in FastAPI, you can read them:
+      const xSummary = apiResponse.headers.get("X-Analysis-Results");
+      summary = xSummary ?? "Annotated image returned.";
+      analysisText = summary;
+    } else {
+      throw new Error("Unsupported response type from API.");
+    }
+
+    const transformedAnalysis = {
+      status,
+      confidence,
+      analysis: analysisText,
+      summary,
+      responseImage,
+    };
+
+    setAnalysis(transformedAnalysis);
+  } catch (err) {
+    console.error("Analysis error:", err);
+    setError(err instanceof Error ? err.message : "Failed to analyze image");
+  } finally {
+    setLoading(false);
+  }
+};
+
   
   React.useEffect(() => {
     analyzeImage();
